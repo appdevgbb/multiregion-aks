@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-two
+spec:
+  template:
+    spec:
+      containers:
+      - name: ingress-two
+        env:
+        - name: TITLE
+          value: "Region Two: Ingress Route Two"

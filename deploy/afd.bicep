@@ -2,23 +2,31 @@ targetScope = 'resourceGroup'
 param prefix string 
 param regionNum array
 param location array
-param loadBalancerFrontendIpConfigurationResourceId string
+param lbFrontendIpConfigId1 string
+param lbFrontendIpConfigId2 string
 
 param privateDnsZoneName string = 'privdns.${prefix}'
-param aRecordName string = regionNum[0]
-param privateHostnameOne string = '${aRecordName}.${privateDnsZoneName}'
-param privateLinkServiceOneName string = '${prefix}-${regionNum[0]}-${location[0]}'
-param vNetNameOne string = 'vnet-${prefix}-${regionNum[0]}'
-
 param afdName string = 'afd-${prefix}'
 param afdEndpointName string = prefix
 param afdOriginGroupName string = prefix
-param afdOriginOneName string = regionNum[0]
 param afdRouteName string = prefix
 //var afdCustomDomainName = replace('${cnameRecordName}.${dnsZoneName}', '.', '-')
 param afdWafPolicyName string = 'afdwaf${prefix}'
 param afdSecurityPolicyName string = 'afd-secpol-${prefix}'
 
+// Front Door Region One Backend
+param aRecordNameOne string = regionNum[0]
+param privateHostnameOne string = '${aRecordNameOne}.${privateDnsZoneName}'
+param privateLinkServiceOneName string = '${prefix}-${regionNum[0]}-${location[0]}'
+param vNetNameOne string = 'vnet-${prefix}-${regionNum[0]}'
+param afdOriginOneName string = regionNum[0]
+
+// Front Door Region Two Backend
+param aRecordNameTwo string = regionNum[1]
+param privateHostnameTwo string = '${aRecordNameTwo}.${privateDnsZoneName}'
+param privateLinkServiceTwoName string = '${prefix}-${regionNum[1]}-${location[1]}'
+param vNetNameTwo string = 'vnet-${prefix}-${regionNum[1]}'
+param afdOriginTwoName string = regionNum[1]
 
 var privateLinkOriginOneDetails = {
   privateLink: {
@@ -26,6 +34,15 @@ var privateLinkOriginOneDetails = {
   }
   groupId: '' // Blank for Private Link Service
   privateLinkLocation: location[0]
+  requestMessage: 'Private Link service from AFD'
+}
+
+var privateLinkOriginTwoDetails = {
+  privateLink: {
+    id: privateLinkServiceTwo.id
+  }
+  groupId: '' // Blank for Private Link Service
+  privateLinkLocation: location[1]
   requestMessage: 'Private Link service from AFD'
 }
 
@@ -38,12 +55,20 @@ resource vnetOne 'Microsoft.Network/virtualNetworks@2021-03-01' existing = {
   }
 }
 
+resource vnetTwo 'Microsoft.Network/virtualNetworks@2021-03-01' existing = {
+  name: vNetNameTwo
+
+  resource snetPrivateLinkEndpoints 'subnets' existing = {
+    name: 'snet-privatelinkservice' 
+  }
+}
+
 resource privateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
   name: privateDnsZoneName
   location: 'global'
 }
 
-resource privateDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+resource privateDnsZoneLinkOne 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
   parent: privateDnsZone
   name: '${vnetOne.name}-link'
   location: 'global'
@@ -55,9 +80,22 @@ resource privateDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLin
   }
 }
 
-// IP hardcoded to 10.240.4.4 for region One internal LB
-resource regionOne 'Microsoft.Network/privateDnsZones/A@2020-06-01' = {
-  name: aRecordName
+resource privateDnsZoneLinkTwo 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsZone
+  name: '${vnetTwo.name}-link'
+  location: 'global'
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: vnetTwo.id
+    }
+  }
+}
+
+
+// IP hardcoded to 10.240.4.4 for AKS internal LB
+resource aRecordOne 'Microsoft.Network/privateDnsZones/A@2020-06-01' = {
+  name: aRecordNameOne
   parent: privateDnsZone
   properties: {
     aRecords: [
@@ -69,7 +107,20 @@ resource regionOne 'Microsoft.Network/privateDnsZones/A@2020-06-01' = {
   }
 }
 
-// Add private link service here to connect to ILB AKS lb
+// IP hardcoded to 10.240.4.4 for AKS internal LB
+resource aRecordTwo 'Microsoft.Network/privateDnsZones/A@2020-06-01' = {
+  name: aRecordNameTwo
+  parent: privateDnsZone
+  properties: {
+    aRecords: [
+      {
+        ipv4Address: '10.240.4.4'
+      }
+    ]
+    ttl: 3600
+  }
+}
+
 resource privateLinkServiceOne 'Microsoft.Network/privateLinkServices@2020-06-01' = {
   name: privateLinkServiceOneName
   location: location[0]
@@ -77,7 +128,7 @@ resource privateLinkServiceOne 'Microsoft.Network/privateLinkServices@2020-06-01
     enableProxyProtocol: false
     loadBalancerFrontendIpConfigurations: [
       {
-        id: loadBalancerFrontendIpConfigurationResourceId
+        id: lbFrontendIpConfigId1
       }
     ]
     ipConfigurations: [
@@ -88,6 +139,32 @@ resource privateLinkServiceOne 'Microsoft.Network/privateLinkServices@2020-06-01
           privateIPAddressVersion: 'IPv4'
           subnet: {
             id: vnetOne::snetPrivateLinkEndpoints.id
+          }
+          primary: true
+        }
+      }
+    ]
+  }
+}
+
+resource privateLinkServiceTwo 'Microsoft.Network/privateLinkServices@2020-06-01' = {
+  name: privateLinkServiceTwoName
+  location: location[1]
+  properties: {
+    enableProxyProtocol: false
+    loadBalancerFrontendIpConfigurations: [
+      {
+        id: lbFrontendIpConfigId2
+      }
+    ]
+    ipConfigurations: [
+      {
+        name: '${vnetTwo::snetPrivateLinkEndpoints.name}-one'
+        properties: {
+          privateIPAllocationMethod: 'Dynamic'
+          privateIPAddressVersion: 'IPv4'
+          subnet: {
+            id: vnetTwo::snetPrivateLinkEndpoints.id
           }
           primary: true
         }
@@ -145,11 +222,26 @@ resource afdOriginOne 'Microsoft.Cdn/profiles/originGroups/origins@2021-06-01' =
   }
 }
 
+resource afdOriginTwo 'Microsoft.Cdn/profiles/originGroups/origins@2021-06-01' = {
+  name: afdOriginTwoName
+  parent: afdOriginGroup
+  properties: {
+    hostName: privateHostnameTwo
+    httpPort: 80
+    httpsPort: 443
+    originHostHeader: privateHostnameTwo
+    priority: 1
+    weight: 1000
+    sharedPrivateLinkResource: privateLinkOriginTwoDetails
+  }
+}
+
 resource afdRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2021-06-01' = {
   name: afdRouteName
   parent: afdEndpoint
   dependsOn: [
     afdOriginOne // This explicit dependency is required to ensure that the origin group is not empty when the route is created.
+    afdOriginTwo
   ]
   properties: {
     originGroup: {

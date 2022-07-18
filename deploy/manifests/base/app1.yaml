@@ -1,33 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ingress-two
+  name: ingress-one
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ingress-two
+      app: ingress-one
   template:
     metadata:
       labels:
-        app: ingress-two
+        app: ingress-one
     spec:
       containers:
-      - name: ingress-two
+      - name: ingress-one
         image: mcr.microsoft.com/azuredocs/aks-helloworld:v1
         ports:
         - containerPort: 80
         env:
         - name: TITLE
-          value: "Ingress Route Two: Region One"
+          value: "Ingress Route One"
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: ingress-two
+  name: ingress-one
 spec:
   type: ClusterIP
   ports:
   - port: 80
   selector:
-    app: ingress-two
+    app: ingress-one

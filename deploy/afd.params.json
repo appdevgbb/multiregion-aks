@@ -6,7 +6,7 @@
       "value": "multiregionaks"
     },
     "location": {
-      "value": ["eastus", "westus2"]
+      "value": ["eastus", "westus3"]
     },
     "regionNum":{
       "value": ["region1", "region2"]
