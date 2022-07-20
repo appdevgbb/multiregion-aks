@@ -107,14 +107,14 @@ resource aRecordOne 'Microsoft.Network/privateDnsZones/A@2020-06-01' = {
   }
 }
 
-// IP hardcoded to 10.240.4.4 for AKS internal LB
+// IP hardcoded to 10.240.4.5 for AKS internal LB
 resource aRecordTwo 'Microsoft.Network/privateDnsZones/A@2020-06-01' = {
   name: aRecordNameTwo
   parent: privateDnsZone
   properties: {
     aRecords: [
       {
-        ipv4Address: '10.240.4.4'
+        ipv4Address: '10.240.4.5'
       }
     ]
     ttl: 3600

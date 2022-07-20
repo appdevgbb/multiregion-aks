@@ -4,6 +4,7 @@ export RG="rg-${prefix}"
 export LOC_1="eastus" # AFD Private Link supported regions: https://docs.microsoft.com/en-us/azure/frontdoor/private-link#region-availability
 export LOC_2="westus3"
 export REGION_NUMS=("region1" "region2")
+export REGION_NUM_IPS=("10.240.4.4" "10.240.4.5")
 export SUB_ID="<YourSubscriptionID>"
 
 # Follow Azure CLI prompts to authenticate to the subscription of your choice
@@ -26,9 +27,10 @@ az deployment group show -n region1  -g $RG --query properties.outputs
 az deployment group show -n region2  -g $RG --query properties.outputs
 
 ##########
-#### Note: the following must be repeated for each cluster. Change the variable below to reference the regional kustomizations.
+#### Note: the following must be repeated for each cluster. Change the variables below to reference the regional kustomizations.
 ##########
 export REGION_NUM=$REGION_NUMS[1]
+export REGION_NUM_IP=$REGION_NUM_IPS[1]
 
 # Deploy Nginx ingress controller with internal LB: https://docs.microsoft.com/en-us/azure/aks/ingress-internal-ip?tabs=azure-cli
 CLUSTER_NAME=$(az deployment group show -n $REGION_NUM -g $RG --query properties.outputs.aksClusterName.value -o tsv)
@@ -41,9 +43,9 @@ helm install nginx-ingress ingress-nginx/ingress-nginx \
     --set controller.nodeSelector."kubernetes\.io/os"=linux \
     --set defaultBackend.nodeSelector."kubernetes\.io/os"=linux \
     --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-health-probe-request-path"=/healthz \
-    -f ./deploy/manifests/internal-ingress.yaml
+    -f ./deploy/manifests/internal-ingress-$REGION_NUM.yaml
 
-# Wait until "External" IP (internal to VNet) address is assigned (hardcoded to 10.240.4.4)
+# Wait until "External" IP (internal to VNet) address is assigned
 kubectl --namespace ingress-basic get services -o wide -w nginx-ingress-ingress-nginx-controller
 
 # Deploy apps and ingress on cluster with kustomizations
@@ -53,9 +55,9 @@ kubectl get pods -n ingress-basic
 # Ensure ingress and app configuration works
 kubectl run -it --rm aks-ingress-test --image=mcr.microsoft.com/dotnet/runtime-deps:6.0 --namespace ingress-basic
 # Run the following inside container shell
-apt-get update && apt-get install -y curl
-curl -L http://10.240.4.4  # Should receive "Region One/Two: Ingress Route One" HTML page
-curl -L http://10.240.4.4/ingress-two # Should receive "Region One/Two: Ingress Route Two" HTML page
+apt-get update && apt-get install -y curl 
+curl -L http://$REGION_NUM_IP # Should receive "Region One/Two: Ingress Route One" HTML page
+curl -L http://$REGION_NUM_IP/ingress-two # Should receive "Region One/Two: Ingress Route Two" HTML page
 # Exit container shell
 
 ##########

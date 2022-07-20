@@ -1,0 +1,6 @@
+controller:
+  service:
+    loadBalancerIP: 10.240.4.5
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+      service.beta.kubernetes.io/azure-load-balancer-internal-subnet: "snet-clusteringressservices"
