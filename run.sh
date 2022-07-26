@@ -86,7 +86,7 @@ do
     az network private-endpoint-connection approve --id $PRIVATE_EP_ID --description "Approved"
 done
 
-# Visit the following url to view your multi-region aks setup! 
+# Navigate to the following url to view your multi-region aks setup! 
 az deployment group show -n afd  -g $RG --query properties.outputs.frontDoorEndpointHostName.value -o tsv   
 
-# TODO: Add node about deletion: Delete PE first, then RG
+# Note: For deletion, ensure you delete the Virtual Network links in Private DNS Zone first, then resouce group with remaining resources
